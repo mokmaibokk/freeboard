@@ -9,40 +9,124 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
-    --bg: #f4f5f7; --panel: #ffffff; --text: #16181d; --muted: #6b7180; --line: #e3e5ea;
-    --ok: #12a150; --warn: #d97706; --bad: #dc2626;
-    --c1: #e5484d; --c2: #0090ff; --c3: #8e4ec6; --c4: #f5a524; --c5: #12a594; --c6: #7c5b3a;
+    --bg: #f4f5f7; --panel: #ffffff; --panel2: #f8f9fb; --text: #16181d; --muted: #6b7180; --line: #e3e5ea; --track: #eceef2;
+    --ok: #12a150; --warn: #d97706; --bad: #dc2626; --info: #0a7ad6;
+    --c1: #e5484d; --c2: #0090ff; --c3: #8e4ec6; --c4: #f5a524; --c5: #12a594; --c6: #d6409f;
+    --glow1: rgba(0,144,255,.10); --glow2: rgba(142,78,198,.10);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f1115; --panel: #181b21; --text: #eceef2; --muted: #8b92a1; --line: #262a33;
-      --c6: #b08968;
+    :root:not([data-theme="light"]) {
+      --bg: #0b0d11; --panel: #15181e; --panel2: #1b1f26; --text: #eceef2; --muted: #8b92a1; --line: #262a33; --track: #262a33;
+      --info: #3b9eff; --glow1: rgba(0,144,255,.16); --glow2: rgba(142,78,198,.16);
     }
   }
+  :root[data-theme="dark"] {
+    --bg: #0b0d11; --panel: #15181e; --panel2: #1b1f26; --text: #eceef2; --muted: #8b92a1; --line: #262a33; --track: #262a33;
+    --info: #3b9eff; --glow1: rgba(0,144,255,.16); --glow2: rgba(142,78,198,.16);
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font-family: "IBM Plex Sans Thai", system-ui, sans-serif; }
+  body { margin: 0; color: var(--text); font-family: "IBM Plex Sans Thai", system-ui, sans-serif;
+         background: radial-gradient(900px 420px at 10% -10%, var(--glow1), transparent 70%),
+                     radial-gradient(800px 420px at 95% 0%, var(--glow2), transparent 70%), var(--bg);
+         background-attachment: fixed; min-height: 100vh; }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
-  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  .mono { font-family: "IBM Plex Mono", monospace; }
+
+  /* ---------- header ---------- */
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
   h1 { font-size: 22px; font-weight: 600; margin: 0; }
   .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
-          background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-  .dot.live { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 1.6s infinite; }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pill, .btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+                background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--text); font-family: inherit; }
+  .btn { cursor: pointer; transition: border-color .2s, transform .1s; }
+  .btn:hover { border-color: var(--muted); }
+  .btn:active { transform: scale(.96); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.live { background: var(--ok); animation: pulse 1.6s infinite; }
   .dot.stale { background: var(--warn); }
   .dot.off { background: var(--bad); }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(18,161,80,.5); } 100% { box-shadow: 0 0 0 8px rgba(18,161,80,0); } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(18,161,80,.55); } 100% { box-shadow: 0 0 0 9px rgba(18,161,80,0); } }
+
+  /* ---------- hero: flow + stats ---------- */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+  .ptitle { font-size: 13px; color: var(--muted); margin-bottom: 12px; display: flex; justify-content: space-between; }
+
+  .flow { display: flex; align-items: center; gap: 0; }
+  .node { flex: none; width: 92px; text-align: center; font-size: 13px; font-weight: 500; }
+  .node .ic { width: 52px; height: 52px; margin: 0 auto 6px; border-radius: 14px; display: grid; place-items: center;
+              background: var(--panel2); border: 1px solid var(--line); transition: box-shadow .4s, border-color .4s; }
+  .node .ic svg { width: 26px; height: 26px; stroke: var(--text); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  @media (max-width: 480px) { .node { width: 74px; font-size: 12px; } .node .ic { width: 44px; height: 44px; } }
+  .node small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+  .node.on .ic { border-color: var(--ok); box-shadow: 0 0 18px -4px var(--ok); }
+  .node.hit .ic { animation: hit .5s ease-out; }
+  @keyframes hit { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+  .wire { position: relative; flex: 1; height: 2px; margin: 0 4px 28px; min-width: 24px;
+          background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 11px); }
+  .packet { position: absolute; top: -4px; left: 0; width: 10px; height: 10px; border-radius: 50%;
+            background: var(--ok); box-shadow: 0 0 12px var(--ok); opacity: 0; }
+  .wire.go .packet { animation: travel .7s ease-in-out forwards; }
+  #w2.go .packet { animation-delay: .75s; }
+  @keyframes travel { 0% { left: 0; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { left: calc(100% - 10px); opacity: 0; } }
+  .flowmeta { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+  .flowmeta b { color: var(--text); font-weight: 500; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 480px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .stat .k { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .v { font-family: "IBM Plex Mono", monospace; font-size: 20px; margin-top: 2px; white-space: nowrap; }
+  .stat .v small { font-size: 12px; color: var(--muted); margin-left: 2px; }
+  .ring { display: flex; align-items: center; gap: 8px; }
+  .ring svg { width: 30px; height: 30px; transform: rotate(-90deg); flex: none; }
+  .ring circle { fill: none; stroke-width: 4; }
+  .ring .bg { stroke: var(--track); }
+  .ring .fg { stroke: var(--info); stroke-linecap: round; }
+
+  .advice { margin-bottom: 14px; }
+  .advice ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+  .advice li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+               background: var(--panel2); border: 1px solid var(--line); border-left: 4px solid var(--muted); animation: fade .4s; }
+  .advice li.ok { border-left-color: var(--ok); } .advice li.warn { border-left-color: var(--warn); }
+  .advice li.bad { border-left-color: var(--bad); } .advice li.info { border-left-color: var(--info); }
+  .advice li .ico { font-size: 18px; line-height: 1.2; }
+
+  /* ---------- sensor cards ---------- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 10px; min-width: 0; }
-  .card .top { display: flex; justify-content: space-between; align-items: baseline; }
+  @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 10px; min-width: 0;
+          cursor: pointer; transition: transform .2s, box-shadow .3s, border-color .3s; position: relative; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -14px rgba(0,0,0,.35); }
+  .card.alert { border-color: var(--bad); animation: alertglow 1.6s ease-in-out infinite; }
+  @keyframes alertglow { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); } 50% { box-shadow: 0 0 22px -4px rgba(220,38,38,.55); } }
+  .card .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .label { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
   .label i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  .range { font-size: 12px; color: var(--muted); }
-  .val { font-family: "IBM Plex Mono", monospace; font-size: 34px; font-weight: 500; margin: 6px 0 4px; }
+  .chip { font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .chip.ok   { color: var(--ok);   background: color-mix(in srgb, var(--ok) 13%, transparent);   border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+  .chip.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+  .chip.bad  { color: var(--bad);  background: color-mix(in srgb, var(--bad) 13%, transparent);  border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
+  .chip.info { color: var(--info); background: color-mix(in srgb, var(--info) 13%, transparent); border-color: color-mix(in srgb, var(--info) 30%, transparent); }
+  .mid { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; margin-top: 4px; }
+  .val { font-family: "IBM Plex Mono", monospace; font-size: 34px; font-weight: 500; line-height: 1.15; transition: color .6s; }
   .val small { font-size: 15px; color: var(--muted); margin-left: 4px; }
-  .chart { height: 110px; }
-  h2 { font-size: 16px; font-weight: 600; margin: 28px 0 10px; }
+  .val.flash { color: var(--info); transition: none; }
+  .delta { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); min-height: 16px; }
+  .delta.up { color: var(--c1); } .delta.down { color: var(--c2); }
+  .gauge { width: 96px; height: 64px; flex: none; }
+  .gauge path { fill: none; stroke-width: 9; stroke-linecap: round; }
+  .gauge .bg { stroke: var(--track); }
+  .gauge .fg { transition: stroke-dasharray .9s cubic-bezier(.2,.8,.2,1); }
+  .gauge text { font-family: "IBM Plex Mono", monospace; font-size: 10px; fill: var(--muted); }
+  .chart { height: 96px; margin-top: 6px; }
+  .range { font-size: 12px; color: var(--muted); margin-top: 4px; display: flex; justify-content: space-between; }
+
+  /* ---------- table ---------- */
+  h2 { font-size: 16px; font-weight: 600; margin: 28px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+  h2 span { font-size: 12px; color: var(--muted); font-weight: 400; }
   .tablebox { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
@@ -50,8 +134,29 @@
   th { color: var(--muted); font-weight: 500; }
   td { font-family: "IBM Plex Mono", monospace; }
   tr:last-child td { border-bottom: 0; }
+  tr.new td { animation: rowin 1.4s ease-out; }
+  @keyframes rowin { from { background: color-mix(in srgb, var(--info) 22%, transparent); } to { background: transparent; } }
   footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
-  code { font-family: "IBM Plex Mono", monospace; }
+
+  /* ---------- modal ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  .modal.open { display: flex; animation: fade .2s; }
+  @keyframes fade { from { opacity: 0; } }
+  .mbox { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; width: min(960px, 100%); padding: 18px; }
+  .mhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .mhead h3 { margin: 0; font-size: 18px; font-weight: 600; }
+  .mstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+  @media (max-width: 520px) { .mstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .bigchart { height: min(52vh, 380px); }
+
+  /* ---------- toasts ---------- */
+  .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 30; max-width: calc(100% - 32px); }
+  .toast { background: var(--panel); border: 1px solid var(--bad); border-left-width: 4px; border-radius: 10px; padding: 10px 14px; font-size: 13px;
+           box-shadow: 0 10px 30px -12px rgba(0,0,0,.5); animation: slide .3s ease-out; width: 300px; max-width: 100%; }
+  .toast b { color: var(--bad); }
+  .toast.out { opacity: 0; transform: translateX(20px); transition: .3s; }
+  @keyframes slide { from { opacity: 0; transform: translateY(12px); } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -61,126 +166,401 @@
       <h1 id="title">IoT Dashboard</h1>
       <div class="sub">ESP32 · ESPHome → Firebase Realtime Database · <span id="dbname"></span></div>
     </div>
-    <div class="pill"><span class="dot" id="dot"></span><span id="status">กำลังเชื่อมต่อ…</span></div>
+    <div class="tools">
+      <div class="pill"><span class="dot" id="dot"></span><span id="status">กำลังเชื่อมต่อ…</span></div>
+      <button class="btn" id="btnTheme" title="สลับธีม">◐ ธีม</button>
+      <button class="btn" id="btnFull" title="เต็มจอ">⛶ เต็มจอ</button>
+      <button class="btn" id="btnCsv" title="ดาวน์โหลดประวัติทั้งหมด">⤓ CSV</button>
+    </div>
   </header>
+
+  <section class="hero">
+    <div class="panel">
+      <div class="ptitle"><span>เส้นทางข้อมูล (Data Pipeline)</span><span id="flowNote">ทุก 10 วินาที</span></div>
+      <div class="flow">
+        <div class="node" id="nEsp"><div class="ic"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg></div>ESP32<small>ESPHome</small></div>
+        <div class="wire" id="w1"><span class="packet"></span></div>
+        <div class="node" id="nDb"><div class="ic"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></div>Firebase<small>RTDB</small></div>
+        <div class="wire" id="w2"><span class="packet"></span></div>
+        <div class="node" id="nWeb"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>Dashboard<small>GitHub Pages</small></div>
+      </div>
+      <div class="flowmeta">
+        <span>Path: <b class="mono" id="pathTxt">-</b></span>
+        <span>ข้อมูลล่าสุด: <b class="mono" id="updated">-</b></span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ptitle"><span>สถานะระบบ</span><span class="mono" id="clock">--:--:--</span></div>
+      <div class="stats">
+        <div class="stat"><div class="k">รอบถัดไป</div>
+          <div class="v ring"><svg viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="15"/><circle class="fg" id="ringFg" cx="18" cy="18" r="15" pathLength="100" stroke-dasharray="0 100"/></svg><span id="next">–</span></div></div>
+        <div class="stat"><div class="k">แพ็กเก็ต (เปิดหน้านี้)</div><div class="v" id="packets">0</div></div>
+        <div class="stat"><div class="k">รายการใน history</div><div class="v" id="total">–</div></div>
+        <div class="stat"><div class="k">รู้สึกเหมือน (Heat Index)</div><div class="v"><span id="feels">–</span><small>°C</small></div></div>
+        <div class="stat"><div class="k">จุดน้ำค้าง (Dew Point)</div><div class="v"><span id="dew">–</span><small>°C</small></div></div>
+        <div class="stat"><div class="k">ค่าที่เกินเกณฑ์</div><div class="v" id="alerts">0</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="panel advice">
+    <div class="ptitle"><span>คำแนะนำสำหรับผู้ใช้ (วิเคราะห์จากค่าล่าสุดอัตโนมัติ)</span></div>
+    <ul id="advice"><li>รอข้อมูล…</li></ul>
+  </div>
 
   <div class="grid" id="cards"></div>
 
-  <h2>ประวัติล่าสุด (history)</h2>
+  <h2>ประวัติล่าสุด (history) <span>คลิกการ์ดด้านบนเพื่อดูกราฟขนาดใหญ่</span></h2>
   <div class="tablebox"><table id="tbl"><thead></thead><tbody></tbody></table></div>
 
-  <footer>อัปเดตล่าสุด: <span id="updated">-</span> · แสดงย้อนหลัง <span id="n">0</span> รายการ</footer>
+  <footer>แสดงในกราฟย้อนหลัง <span id="n">0</span> รายการ · iot-<span id="sid"></span></footer>
 </div>
+
+<div class="modal" id="modal">
+  <div class="mbox">
+    <div class="mhead"><h3 id="mTitle">-</h3><button class="btn" id="mClose">✕ ปิด</button></div>
+    <div class="mstats">
+      <div class="stat"><div class="k">ล่าสุด</div><div class="v" id="mLast">–</div></div>
+      <div class="stat"><div class="k">ต่ำสุด</div><div class="v" id="mMin">–</div></div>
+      <div class="stat"><div class="k">เฉลี่ย</div><div class="v" id="mAvg">–</div></div>
+      <div class="stat"><div class="k">สูงสุด</div><div class="v" id="mMax">–</div></div>
+    </div>
+    <div class="bigchart"><canvas id="bigCanvas"></canvas></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
 
 <script type="module">
 // ===================== ตั้งค่า (แก้ตรงนี้) =====================
-const STUDENT_ID   = "109";
-const DATABASE_URL = "https://iot-109-default-rtdb.asia-southeast1.firebasedatabase.app";
-const BASE_PATH    = "iot-109";  // node หลักใน Firebase
-const HISTORY_LIMIT = 30;   // จำนวนจุดย้อนหลังในกราฟ
+const STUDENT_ID    = "109";
+const DATABASE_URL  = "https://iot-109-default-rtdb.asia-southeast1.firebasedatabase.app";
+const BASE_PATH     = "iot-109";  // node หลักใน Firebase
+const SEND_EVERY    = 10;         // ESP32 ส่งข้อมูลทุกกี่วินาที
+const SPARK_POINTS  = 30;         // จุดในกราฟเล็ก
+const HISTORY_LIMIT = 100;        // จุดในกราฟใหญ่
 // ===========================================================
 
+// level(v) -> [ข้อความสถานะ, ระดับสี ok|warn|bad|info]
 const SENSORS = [
-  { key: "temp",        name: "อุณหภูมิ",        unit: "°C",  dp: 1, color: "--c1" },
-  { key: "humi",        name: "ความชื้นอากาศ",   unit: "%",   dp: 1, color: "--c2" },
-  { key: "pressure",    name: "ความกดอากาศ",     unit: "hPa", dp: 1, color: "--c3" },
-  { key: "light",       name: "ความเข้มแสง",     unit: "lx",  dp: 0, color: "--c4" },
-  { key: "co2",         name: "CO₂",             unit: "ppm", dp: 0, color: "--c5" },
-  { key: "pm25",        name: "PM2.5",           unit: "µg/m³", dp: 1, color: "--c6" },
+  { key: "temp", name: "อุณหภูมิ", unit: "°C", dp: 1, color: "--c1", min: 15, max: 40,
+    level: v => v < 18 ? ["เย็น", "info"] : v <= 30 ? ["สบาย", "ok"] : v <= 33 ? ["อุ่น", "warn"] : ["ร้อน", "bad"] },
+  { key: "humi", name: "ความชื้นอากาศ", unit: "%", dp: 1, color: "--c2", min: 0, max: 100,
+    level: v => v < 30 ? ["แห้ง", "warn"] : v <= 70 ? ["เหมาะสม", "ok"] : v <= 80 ? ["ชื้น", "warn"] : ["ชื้นมาก", "bad"] },
+  { key: "pressure", name: "ความกดอากาศ", unit: "hPa", dp: 1, color: "--c3", min: 990, max: 1035,
+    level: v => v < 1005 ? ["ต่ำ", "info"] : v <= 1020 ? ["ปกติ", "ok"] : ["สูง", "info"] },
+  { key: "light", name: "ความเข้มแสง", unit: "lx", dp: 0, color: "--c4", min: 0, max: 1000,
+    level: v => v < 200 ? ["สลัว", "info"] : v <= 700 ? ["สว่าง", "ok"] : ["สว่างมาก", "warn"] },
+  { key: "co2", name: "CO₂", unit: "ppm", dp: 0, color: "--c5", min: 400, max: 1500,
+    level: v => v <= 800 ? ["ดีมาก", "ok"] : v <= 1000 ? ["ปกติ", "ok"] : v <= 1500 ? ["อากาศอับ", "warn"] : ["อันตราย", "bad"] },
+  { key: "pm25", name: "PM2.5", unit: "µg/m³", dp: 1, color: "--c6", min: 0, max: 100,   // เกณฑ์ AQI ประเทศไทย
+    level: v => v <= 15 ? ["ดีมาก", "ok"] : v <= 25 ? ["ดี", "ok"] : v <= 37.5 ? ["ปานกลาง", "warn"] : v <= 75 ? ["เริ่มมีผลกระทบ", "warn"] : ["มีผลกระทบ", "bad"] },
 ];
 
-document.getElementById("title").textContent = `IoT Dashboard · iot-${STUDENT_ID}`;
-document.getElementById("dbname").textContent = new URL(DATABASE_URL).hostname.split(".")[0];
-
+const $ = id => document.getElementById(id);
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fmt = (v, dp) => (typeof v === "number" && isFinite(v)) ? v.toFixed(dp) : "–";
-const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString("th-TH", { hour12: false }) : "–";
+const fmtTime = ms => ms ? new Date(ms).toLocaleTimeString("th-TH", { hour12: false }) : "–";
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const tsMs = r => (r && r.timestamp) ? r.timestamp * 1000 : 0;
 
-// ---------- สร้างการ์ด + กราฟ ----------
-const cardsEl = document.getElementById("cards");
+$("title").textContent = `IoT Dashboard · iot-${STUDENT_ID}`;
+$("sid").textContent = STUDENT_ID;
+$("dbname").textContent = new URL(DATABASE_URL).hostname.split(".")[0];
+$("pathTxt").textContent = `/${BASE_PATH}/{latest,history}`;
+$("flowNote").textContent = `ทุก ${SEND_EVERY} วินาที`;
+
+// ---------- ธีม ----------
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+$("btnTheme").onclick = () => {
+  const dark = document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === "dark"
+    : matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("theme", next); } catch {}
+  restyleCharts();
+};
+$("btnFull").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+
+// ---------- การ์ด + เกจ + กราฟเล็ก ----------
 const charts = {};
+const lineOpts = (s, small) => ({
+  responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+  interaction: { mode: "index", intersect: false },
+  plugins: { legend: { display: false },
+             tooltip: { callbacks: { label: c => `${fmt(c.parsed.y, s.dp)} ${s.unit}` } } },
+  scales: {
+    x: { display: !small, grid: { display: false }, ticks: { color: css("--muted"), maxTicksLimit: 8, font: { size: 11 } } },
+    y: { grid: { color: css("--line") }, border: { display: false },
+         ticks: { color: css("--muted"), maxTicksLimit: small ? 4 : 6, font: { size: 11 } } },
+  },
+});
+const dataset = color => ({ data: [], borderColor: color, backgroundColor: color + "22", fill: true, tension: .35,
+                            pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 });
+
 for (const s of SENSORS) {
   const el = document.createElement("div");
   el.className = "card";
+  el.id = `card-${s.key}`;
   el.innerHTML = `
     <div class="top">
       <div class="label"><i style="background:var(${s.color})"></i>${s.name}</div>
-      <div class="range" id="r-${s.key}"></div>
+      <span class="chip" id="s-${s.key}">–</span>
     </div>
-    <div class="val"><span id="v-${s.key}">–</span><small>${s.unit}</small></div>
-    <div class="chart"><canvas id="c-${s.key}"></canvas></div>`;
-  cardsEl.appendChild(el);
-
-  const color = css(s.color);
-  charts[s.key] = new Chart(document.getElementById(`c-${s.key}`), {
-    type: "line",
-    data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + "22",
-            fill: true, tension: .35, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
-      interaction: { mode: "index", intersect: false },
-      plugins: { legend: { display: false },
-                 tooltip: { callbacks: { label: c => `${fmt(c.parsed.y, s.dp)} ${s.unit}` } } },
-      scales: {
-        x: { display: false },
-        y: { grid: { color: css("--line") }, border: { display: false },
-             ticks: { color: css("--muted"), maxTicksLimit: 4, font: { size: 11 } } },
-      },
-    },
-  });
+    <div class="mid">
+      <div>
+        <div class="val" id="vw-${s.key}"><span id="v-${s.key}">–</span><small>${s.unit}</small></div>
+        <div class="delta" id="d-${s.key}"></div>
+      </div>
+      <svg class="gauge" viewBox="0 0 100 66">
+        <path class="bg" d="M10 50 A40 40 0 0 1 90 50" pathLength="100"/>
+        <path class="fg" id="g-${s.key}" d="M10 50 A40 40 0 0 1 90 50" pathLength="100" stroke="var(${s.color})" stroke-dasharray="0 100"/>
+        <text x="1" y="65">${s.min}</text><text x="99" y="65" text-anchor="end">${s.max}</text>
+      </svg>
+    </div>
+    <div class="chart"><canvas id="c-${s.key}"></canvas></div>
+    <div class="range" id="r-${s.key}"></div>`;
+  el.onclick = () => openModal(s);
+  $("cards").appendChild(el);
+  charts[s.key] = new Chart($(`c-${s.key}`), { type: "line", data: { labels: [], datasets: [dataset(css(s.color))] }, options: lineOpts(s, true) });
 }
 
-// ---------- ตาราง ----------
-const thead = document.querySelector("#tbl thead");
-thead.innerHTML = `<tr><th>เวลา</th>${SENSORS.map(s => `<th>${s.name} (${s.unit})</th>`).join("")}</tr>`;
+$("tbl").querySelector("thead").innerHTML =
+  `<tr><th>เวลา</th>${SENSORS.map(s => `<th>${s.name} (${s.unit})</th>`).join("")}</tr>`;
 
-// ---------- แสดงผล ----------
-let lastTs = 0;
+// ---------- ตัวเลขวิ่ง ----------
+function tween(el, from, to, dp) {
+  if (typeof to !== "number") { el.textContent = "–"; return; }
+  if (typeof from !== "number" || from === to) { el.textContent = to.toFixed(dp); return; }
+  const t0 = performance.now(), dur = 700;
+  const step = t => {
+    const p = clamp((t - t0) / dur, 0, 1), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = (from + (to - from) * e).toFixed(dp);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// ---------- ค่าคำนวณ ----------
+function heatIndex(t, rh) {
+  if (t < 27 || rh < 40) return t;
+  const f = t * 9 / 5 + 32;
+  const hi = -42.379 + 2.04901523 * f + 10.14333127 * rh - .22475541 * f * rh - .00683783 * f * f
+           - .05481717 * rh * rh + .00122874 * f * f * rh + .00085282 * f * rh * rh - .00000199 * f * f * rh * rh;
+  return (hi - 32) * 5 / 9;
+}
+function dewPoint(t, rh) {
+  const a = 17.27, b = 237.7, g = (a * t) / (b + t) + Math.log(rh / 100);
+  return (b * g) / (a - g);
+}
+
+// ---------- คำแนะนำ ----------
+function advise(d) {
+  const out = [], hi = heatIndex(d.temp, d.humi);
+  if (d.pm25 > 75)        out.push(["bad",  "😷", `PM2.5 ${fmt(d.pm25, 1)} µg/m³ มีผลกระทบต่อสุขภาพ ควรสวมหน้ากาก N95 และงดกิจกรรมกลางแจ้ง`]);
+  else if (d.pm25 > 37.5) out.push(["warn", "😷", `PM2.5 ${fmt(d.pm25, 1)} µg/m³ เริ่มมีผลกระทบ เด็ก ผู้สูงอายุ และผู้มีโรคประจำตัวควรลดเวลานอกอาคาร`]);
+  if (d.co2 > 1000)       out.push(["warn", "🪟", `CO₂ ${fmt(d.co2, 0)} ppm อากาศเริ่มอับ อาจง่วงและขาดสมาธิ ควรเปิดหน้าต่างระบายอากาศ`]);
+  if (hi >= 41)           out.push(["bad",  "🥵", `รู้สึกเหมือน ${fmt(hi, 1)} °C เสี่ยงโรคลมแดด ควรอยู่ในที่ร่มและดื่มน้ำบ่อย ๆ`]);
+  else if (hi >= 32)      out.push(["warn", "💧", `รู้สึกเหมือน ${fmt(hi, 1)} °C อากาศร้อน ควรดื่มน้ำให้เพียงพอ`]);
+  if (d.humi > 80)        out.push(["warn", "🍄", `ความชื้น ${fmt(d.humi, 1)}% สูง เสี่ยงเชื้อรา ควรเปิดพัดลมหรือเครื่องลดความชื้น`]);
+  else if (d.humi < 30)   out.push(["warn", "🧴", `ความชื้น ${fmt(d.humi, 1)}% ต่ำ ผิวและทางเดินหายใจอาจแห้ง`]);
+  if (d.light < 200)      out.push(["info", "💡", `แสง ${fmt(d.light, 0)} lx น้อยเกินไปสำหรับการอ่านหนังสือ (แนะนำ 300–500 lx) ควรเปิดไฟเพิ่ม`]);
+  if (!out.length)        out.push(["ok",   "✅", "สภาพแวดล้อมโดยรวมเหมาะสม ไม่มีค่าที่ต้องกังวล"]);
+  $("advice").innerHTML = out.map(([c, i, t]) => `<li class="${c}"><span class="ico">${i}</span><span>${t}</span></li>`).join("");
+}
+
+// ---------- แจ้งเตือน ----------
+function toast(html) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.innerHTML = html;
+  $("toasts").appendChild(t);
+  while ($("toasts").children.length > 3) $("toasts").firstChild.remove();
+  setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 350); }, 4500);
+}
+
+// ---------- แสดงผล latest ----------
+let prev = null, lastTs = 0, packets = 0;
+const prevLevel = {};
+function restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
 function renderLatest(d) {
   if (!d) return;
-  for (const s of SENSORS) document.getElementById(`v-${s.key}`).textContent = fmt(d[s.key], s.dp);
-  lastTs = d.timestamp ? d.timestamp * 1000 : Date.now();
-  document.getElementById("updated").textContent = new Date(lastTs).toLocaleString("th-TH", { hour12: false });
+  const isNew = !prev || d.timestamp !== prev.timestamp;
+  let alerts = 0;
+  for (const s of SENSORS) {
+    const v = d[s.key], old = prev ? prev[s.key] : undefined;
+    tween($(`v-${s.key}`), old, v, s.dp);
+    if (typeof v !== "number") continue;
+
+    const dEl = $(`d-${s.key}`);
+    if (typeof old === "number" && isNew) {
+      const diff = v - old;
+      dEl.className = "delta " + (diff > 0 ? "up" : diff < 0 ? "down" : "");
+      dEl.textContent = `${diff > 0 ? "▲" : diff < 0 ? "▼" : "■"} ${fmt(Math.abs(diff), s.dp)} จากรอบก่อน`;
+    }
+    $(`g-${s.key}`).style.strokeDasharray = `${clamp((v - s.min) / (s.max - s.min) * 100, 0, 100)} 100`;
+
+    const [txt, cls] = s.level(v);
+    const chip = $(`s-${s.key}`);
+    chip.textContent = txt; chip.className = `chip ${cls}`;
+    $(`card-${s.key}`).classList.toggle("alert", cls === "bad");
+    if (cls === "bad") {
+      alerts++;
+      if (prev && prevLevel[s.key] !== "bad") toast(`<b>⚠ ${s.name} ${txt}</b><br>ค่า ${fmt(v, s.dp)} ${s.unit}`);
+    }
+    prevLevel[s.key] = cls;
+    if (prev && isNew) { const w = $(`vw-${s.key}`); w.classList.add("flash"); setTimeout(() => w.classList.remove("flash"), 60); }
+  }
+  $("alerts").textContent = alerts;
+  $("alerts").style.color = alerts ? css("--bad") : "";
+
+  if (isNew) advise(d);
+  if (typeof d.temp === "number" && typeof d.humi === "number") {
+    $("feels").textContent = heatIndex(d.temp, d.humi).toFixed(1);
+    $("dew").textContent = dewPoint(d.temp, d.humi).toFixed(1);
+  }
+
+  if (prev && isNew) {
+    packets++;
+    $("packets").textContent = packets;
+    restart($("w1"), "go"); restart($("w2"), "go");
+    restart($("nEsp"), "hit");
+    setTimeout(() => restart($("nDb"), "hit"), 700);
+    setTimeout(() => restart($("nWeb"), "hit"), 1450);
+  }
+  lastTs = tsMs(d) || Date.now();
+  $("updated").textContent = new Date(lastTs).toLocaleString("th-TH", { hour12: false });
+  prev = d;
   updateStatus();
 }
 
-function renderHistory(rows) {
+// ---------- แสดงผล history ----------
+let rows = [], lastRowTs = 0;
+function renderHistory(list) {
+  rows = list;
+  const spark = rows.slice(-SPARK_POINTS);
   for (const s of SENSORS) {
     const ch = charts[s.key];
-    const vals = rows.map(r => r[s.key]);
-    ch.data.labels = rows.map(r => fmtTime(r.timestamp * 1000));
-    ch.data.datasets[0].data = vals;
+    ch.data.labels = spark.map(r => fmtTime(tsMs(r)));
+    ch.data.datasets[0].data = spark.map(r => r[s.key]);
     ch.update();
-    const nums = vals.filter(v => typeof v === "number");
-    document.getElementById(`r-${s.key}`).textContent =
-      nums.length ? `ต่ำสุด ${fmt(Math.min(...nums), s.dp)} · สูงสุด ${fmt(Math.max(...nums), s.dp)}` : "";
+    const nums = spark.map(r => r[s.key]).filter(v => typeof v === "number");
+    $(`r-${s.key}`).innerHTML = nums.length
+      ? `<span>ต่ำสุด ${fmt(Math.min(...nums), s.dp)}</span><span>เฉลี่ย ${fmt(nums.reduce((a, b) => a + b, 0) / nums.length, s.dp)}</span><span>สูงสุด ${fmt(Math.max(...nums), s.dp)}</span>`
+      : "";
   }
-  document.querySelector("#tbl tbody").innerHTML = rows.slice(-10).reverse().map(r =>
-    `<tr><td>${fmtTime(r.timestamp * 1000)}</td>${SENSORS.map(s => `<td>${fmt(r[s.key], s.dp)}</td>`).join("")}</tr>`).join("");
-  document.getElementById("n").textContent = rows.length;
+  const newest = tsMs(rows[rows.length - 1]);
+  const highlight = lastRowTs && newest > lastRowTs;
+  lastRowTs = newest;
+  $("tbl").querySelector("tbody").innerHTML = rows.slice(-10).reverse().map((r, i) =>
+    `<tr class="${highlight && i === 0 ? "new" : ""}"><td>${fmtTime(tsMs(r))}</td>${SENSORS.map(s => `<td>${fmt(r[s.key], s.dp)}</td>`).join("")}</tr>`).join("");
+  $("n").textContent = spark.length;
+  if (modalSensor) fillModal();
 }
 
+// ---------- modal กราฟใหญ่ ----------
+let modalSensor = null, bigChart = null;
+function openModal(s) {
+  modalSensor = s;
+  $("mTitle").innerHTML = `<span style="color:var(${s.color})">■</span> ${s.name} <small style="color:var(--muted);font-weight:400">(${s.unit}) · ${HISTORY_LIMIT} จุดล่าสุด</small>`;
+  $("modal").classList.add("open");
+  if (bigChart) bigChart.destroy();
+  bigChart = new Chart($("bigCanvas"), { type: "line", data: { labels: [], datasets: [dataset(css(s.color))] }, options: lineOpts(s, false) });
+  bigChart.data.datasets[0].pointRadius = 2;
+  fillModal();
+}
+function fillModal() {
+  const s = modalSensor, vals = rows.map(r => r[s.key]);
+  bigChart.data.labels = rows.map(r => fmtTime(tsMs(r)));
+  bigChart.data.datasets[0].data = vals;
+  bigChart.update();
+  const nums = vals.filter(v => typeof v === "number");
+  if (!nums.length) return;
+  const u = `<small>${s.unit}</small>`;
+  $("mLast").innerHTML = fmt(nums[nums.length - 1], s.dp) + u;
+  $("mMin").innerHTML = fmt(Math.min(...nums), s.dp) + u;
+  $("mAvg").innerHTML = fmt(nums.reduce((a, b) => a + b, 0) / nums.length, s.dp) + u;
+  $("mMax").innerHTML = fmt(Math.max(...nums), s.dp) + u;
+}
+function closeModal() { $("modal").classList.remove("open"); modalSensor = null; }
+$("mClose").onclick = closeModal;
+$("modal").onclick = e => { if (e.target.id === "modal") closeModal(); };
+addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+function restyleCharts() {
+  const all = [...Object.values(charts), bigChart].filter(Boolean);
+  for (const ch of all) {
+    ch.options.scales.y.grid.color = css("--line");
+    ch.options.scales.y.ticks.color = css("--muted");
+    ch.options.scales.x.ticks.color = css("--muted");
+    ch.update("none");
+  }
+}
+
+// ---------- สถานะ + นาฬิกา + วงนับถอยหลัง ----------
 let connected = false;
 function updateStatus() {
-  const dot = document.getElementById("dot"), st = document.getElementById("status");
+  const dot = $("dot"), st = $("status");
   const age = (Date.now() - lastTs) / 1000;
-  if (!connected)            { dot.className = "dot off";   st.textContent = "ไม่ได้เชื่อมต่อ Firebase"; }
-  else if (!lastTs)          { dot.className = "dot stale"; st.textContent = "รอข้อมูลจาก ESP32…"; }
-  else if (age < 30)         { dot.className = "dot live";  st.textContent = `Live · ${Math.max(0, Math.round(age))} วินาทีที่แล้ว`; }
-  else                       { dot.className = "dot stale"; st.textContent = `ไม่มีข้อมูลใหม่ ${Math.round(age)} วินาที`; }
+  const live = connected && lastTs && age < SEND_EVERY * 3;
+  if (!connected)  { dot.className = "dot off";   st.textContent = "ไม่ได้เชื่อมต่อ Firebase"; }
+  else if (!lastTs){ dot.className = "dot stale"; st.textContent = "รอข้อมูลจาก ESP32…"; }
+  else if (live)   { dot.className = "dot live";  st.textContent = `Live · ${Math.max(0, Math.round(age))} วินาทีที่แล้ว`; }
+  else             { dot.className = "dot stale"; st.textContent = `ไม่มีข้อมูลใหม่ ${Math.round(age)} วินาที`; }
+  $("nEsp").classList.toggle("on", !!live);
+  $("nDb").classList.toggle("on", connected);
+  $("nWeb").classList.toggle("on", true);
 }
-setInterval(updateStatus, 1000);
+setInterval(() => { updateStatus(); $("clock").textContent = new Date().toLocaleTimeString("th-TH", { hour12: false }); }, 1000);
 
-// ---------- โหมด demo (เปิดด้วย ?demo) สำหรับทดสอบหน้าเว็บโดยไม่ต่อ Firebase ----------
-if (new URLSearchParams(location.search).has("demo")) {
+(function ring() {
+  if (lastTs) {
+    const el = (Date.now() - lastTs) / 1000;
+    const p = clamp(el / SEND_EVERY, 0, 1);
+    $("ringFg").setAttribute("stroke-dasharray", `${p * 100} 100`);
+    $("next").textContent = el < SEND_EVERY ? `${Math.ceil(SEND_EVERY - el)}s` : "รอ…";
+  }
+  requestAnimationFrame(ring);
+})();
+
+// ---------- CSV ----------
+$("btnCsv").onclick = async () => {
+  let list = rows;
+  if (!DEMO) {
+    try {
+      const all = await (await fetch(`${DATABASE_URL}/${BASE_PATH}/history.json`)).json();
+      list = Object.keys(all || {}).sort().map(k => all[k]);
+    } catch { /* ใช้ข้อมูลที่โหลดไว้แล้วแทน */ }
+  }
+  const head = ["datetime", "timestamp", ...SENSORS.map(s => s.key)];
+  const lines = list.map(r => [new Date(tsMs(r)).toISOString(), r.timestamp, ...SENSORS.map(s => r[s.key] ?? "")].join(","));
+  const blob = new Blob(["﻿" + [head.join(","), ...lines].join("\n")], { type: "text/csv" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `iot-${STUDENT_ID}-history.csv` });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+// ---------- จำนวนรายการทั้งหมดใน history ----------
+async function refreshTotal() {
+  if (DEMO) { $("total").textContent = rows.length; return; }
+  try {
+    const keys = await (await fetch(`${DATABASE_URL}/${BASE_PATH}/history.json?shallow=true`)).json();
+    $("total").textContent = Object.keys(keys || {}).length.toLocaleString();
+  } catch {}
+}
+
+// ---------- โหมด demo (เปิดด้วย ?demo) ----------
+const DEMO = new URLSearchParams(location.search).has("demo");
+if (DEMO) {
   const rnd = (a, b, dp) => +(a + Math.random() * (b - a)).toFixed(dp);
   const gen = ms => ({ timestamp: Math.floor(ms / 1000), temp: rnd(24, 34, 1), humi: rnd(40, 85, 1), pressure: rnd(1000, 1025, 1),
                        light: rnd(100, 1000, 0), co2: rnd(400, 1200, 0), pm25: rnd(10, 80, 1) });
-  const rows = Array.from({ length: HISTORY_LIMIT }, (_, i) => gen(Date.now() - (HISTORY_LIMIT - i) * 10000));
+  const list = Array.from({ length: HISTORY_LIMIT }, (_, i) => gen(Date.now() - (HISTORY_LIMIT - i) * SEND_EVERY * 1000));
   connected = true;
-  const tick = () => { const r = gen(Date.now()); rows.push(r); rows.splice(0, rows.length - HISTORY_LIMIT);
-                       renderLatest(r); renderHistory(rows); };
-  tick(); setInterval(tick, 10000);
+  const tick = () => { const r = gen(Date.now()); list.push(r); list.splice(0, list.length - HISTORY_LIMIT);
+                       renderLatest(r); renderHistory([...list]); refreshTotal(); };
+  tick(); setInterval(tick, SEND_EVERY * 1000);
 } else {
   // ---------- Firebase Realtime Database ----------
   const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
@@ -191,9 +571,10 @@ if (new URLSearchParams(location.search).has("demo")) {
   onValue(ref(db, ".info/connected"), s => { connected = !!s.val(); updateStatus(); });
   onValue(ref(db, `${BASE_PATH}/latest`), s => renderLatest(s.val()));
   onValue(query(ref(db, `${BASE_PATH}/history`), limitToLast(HISTORY_LIMIT)), s => {
-    const rows = [];
-    s.forEach(c => { rows.push(c.val()); });
-    renderHistory(rows);
+    const list = [];
+    s.forEach(c => { list.push(c.val()); });
+    renderHistory(list);
+    refreshTotal();
   });
 }
 </script>
