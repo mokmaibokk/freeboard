@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IoT Freeboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #16181d; --muted: #6b7180; --line: #e3e5ea;
+    --ok: #12a150; --warn: #d97706; --bad: #dc2626;
+    --c1: #e5484d; --c2: #0090ff; --c3: #8e4ec6; --c4: #f5a524; --c5: #12a594; --c6: #7c5b3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --panel: #181b21; --text: #eceef2; --muted: #8b92a1; --line: #262a33;
+      --c6: #b08968;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "IBM Plex Sans Thai", system-ui, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+          background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 1.6s infinite; }
+  .dot.stale { background: var(--warn); }
+  .dot.off { background: var(--bad); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(18,161,80,.5); } 100% { box-shadow: 0 0 0 8px rgba(18,161,80,0); } }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 10px; min-width: 0; }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .label { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .label i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .range { font-size: 12px; color: var(--muted); }
+  .val { font-family: "IBM Plex Mono", monospace; font-size: 34px; font-weight: 500; margin: 6px 0 4px; }
+  .val small { font-size: 15px; color: var(--muted); margin-left: 4px; }
+  .chart { height: 110px; }
+  h2 { font-size: 16px; font-weight: 600; margin: 28px 0 10px; }
+  .tablebox { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  td { font-family: "IBM Plex Mono", monospace; }
+  tr:last-child td { border-bottom: 0; }
+  footer { margin-top: 24px; color: var(--muted); font-size: 12px; }
+  code { font-family: "IBM Plex Mono", monospace; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">IoT Dashboard</h1>
+      <div class="sub">ESP32 · ESPHome → Firebase Realtime Database · <span id="dbname"></span></div>
+    </div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="status">กำลังเชื่อมต่อ…</span></div>
+  </header>
+
+  <div class="grid" id="cards"></div>
+
+  <h2>ประวัติล่าสุด (history)</h2>
+  <div class="tablebox"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+
+  <footer>อัปเดตล่าสุด: <span id="updated">-</span> · แสดงย้อนหลัง <span id="n">0</span> รายการ</footer>
+</div>
+
+<script type="module">
+// ===================== ตั้งค่า (แก้ตรงนี้) =====================
+const STUDENT_ID   = "109";
+const DATABASE_URL = "https://iot-109-default-rtdb.asia-southeast1.firebasedatabase.app";
+const BASE_PATH    = "iot-109";  // node หลักใน Firebase
+const HISTORY_LIMIT = 30;   // จำนวนจุดย้อนหลังในกราฟ
+// ===========================================================
+
+const SENSORS = [
+  { key: "temp",        name: "อุณหภูมิ",        unit: "°C",  dp: 1, color: "--c1" },
+  { key: "humi",        name: "ความชื้นอากาศ",   unit: "%",   dp: 1, color: "--c2" },
+  { key: "pressure",    name: "ความกดอากาศ",     unit: "hPa", dp: 1, color: "--c3" },
+  { key: "light",       name: "ความเข้มแสง",     unit: "lx",  dp: 0, color: "--c4" },
+  { key: "co2",         name: "CO₂",             unit: "ppm", dp: 0, color: "--c5" },
+  { key: "pm25",        name: "PM2.5",           unit: "µg/m³", dp: 1, color: "--c6" },
+];
+
+document.getElementById("title").textContent = `IoT Dashboard · iot-${STUDENT_ID}`;
+document.getElementById("dbname").textContent = new URL(DATABASE_URL).hostname.split(".")[0];
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, dp) => (typeof v === "number" && isFinite(v)) ? v.toFixed(dp) : "–";
+const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString("th-TH", { hour12: false }) : "–";
+
+// ---------- สร้างการ์ด + กราฟ ----------
+const cardsEl = document.getElementById("cards");
+const charts = {};
+for (const s of SENSORS) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `
+    <div class="top">
+      <div class="label"><i style="background:var(${s.color})"></i>${s.name}</div>
+      <div class="range" id="r-${s.key}"></div>
+    </div>
+    <div class="val"><span id="v-${s.key}">–</span><small>${s.unit}</small></div>
+    <div class="chart"><canvas id="c-${s.key}"></canvas></div>`;
+  cardsEl.appendChild(el);
+
+  const color = css(s.color);
+  charts[s.key] = new Chart(document.getElementById(`c-${s.key}`), {
+    type: "line",
+    data: { labels: [], datasets: [{ data: [], borderColor: color, backgroundColor: color + "22",
+            fill: true, tension: .35, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false },
+                 tooltip: { callbacks: { label: c => `${fmt(c.parsed.y, s.dp)} ${s.unit}` } } },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: css("--line") }, border: { display: false },
+             ticks: { color: css("--muted"), maxTicksLimit: 4, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+// ---------- ตาราง ----------
+const thead = document.querySelector("#tbl thead");
+thead.innerHTML = `<tr><th>เวลา</th>${SENSORS.map(s => `<th>${s.name} (${s.unit})</th>`).join("")}</tr>`;
+
+// ---------- แสดงผล ----------
+let lastTs = 0;
+function renderLatest(d) {
+  if (!d) return;
+  for (const s of SENSORS) document.getElementById(`v-${s.key}`).textContent = fmt(d[s.key], s.dp);
+  lastTs = d.timestamp ? d.timestamp * 1000 : Date.now();
+  document.getElementById("updated").textContent = new Date(lastTs).toLocaleString("th-TH", { hour12: false });
+  updateStatus();
+}
+
+function renderHistory(rows) {
+  for (const s of SENSORS) {
+    const ch = charts[s.key];
+    const vals = rows.map(r => r[s.key]);
+    ch.data.labels = rows.map(r => fmtTime(r.timestamp * 1000));
+    ch.data.datasets[0].data = vals;
+    ch.update();
+    const nums = vals.filter(v => typeof v === "number");
+    document.getElementById(`r-${s.key}`).textContent =
+      nums.length ? `ต่ำสุด ${fmt(Math.min(...nums), s.dp)} · สูงสุด ${fmt(Math.max(...nums), s.dp)}` : "";
+  }
+  document.querySelector("#tbl tbody").innerHTML = rows.slice(-10).reverse().map(r =>
+    `<tr><td>${fmtTime(r.timestamp * 1000)}</td>${SENSORS.map(s => `<td>${fmt(r[s.key], s.dp)}</td>`).join("")}</tr>`).join("");
+  document.getElementById("n").textContent = rows.length;
+}
+
+let connected = false;
+function updateStatus() {
+  const dot = document.getElementById("dot"), st = document.getElementById("status");
+  const age = (Date.now() - lastTs) / 1000;
+  if (!connected)            { dot.className = "dot off";   st.textContent = "ไม่ได้เชื่อมต่อ Firebase"; }
+  else if (!lastTs)          { dot.className = "dot stale"; st.textContent = "รอข้อมูลจาก ESP32…"; }
+  else if (age < 30)         { dot.className = "dot live";  st.textContent = `Live · ${Math.max(0, Math.round(age))} วินาทีที่แล้ว`; }
+  else                       { dot.className = "dot stale"; st.textContent = `ไม่มีข้อมูลใหม่ ${Math.round(age)} วินาที`; }
+}
+setInterval(updateStatus, 1000);
+
+// ---------- โหมด demo (เปิดด้วย ?demo) สำหรับทดสอบหน้าเว็บโดยไม่ต่อ Firebase ----------
+if (new URLSearchParams(location.search).has("demo")) {
+  const rnd = (a, b, dp) => +(a + Math.random() * (b - a)).toFixed(dp);
+  const gen = ms => ({ timestamp: Math.floor(ms / 1000), temp: rnd(24, 34, 1), humi: rnd(40, 85, 1), pressure: rnd(1000, 1025, 1),
+                       light: rnd(100, 1000, 0), co2: rnd(400, 1200, 0), pm25: rnd(10, 80, 1) });
+  const rows = Array.from({ length: HISTORY_LIMIT }, (_, i) => gen(Date.now() - (HISTORY_LIMIT - i) * 10000));
+  connected = true;
+  const tick = () => { const r = gen(Date.now()); rows.push(r); rows.splice(0, rows.length - HISTORY_LIMIT);
+                       renderLatest(r); renderHistory(rows); };
+  tick(); setInterval(tick, 10000);
+} else {
+  // ---------- Firebase Realtime Database ----------
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+  const { getDatabase, ref, onValue, query, limitToLast } =
+    await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js");
+
+  const db = getDatabase(initializeApp({ databaseURL: DATABASE_URL }));
+  onValue(ref(db, ".info/connected"), s => { connected = !!s.val(); updateStatus(); });
+  onValue(ref(db, `${BASE_PATH}/latest`), s => renderLatest(s.val()));
+  onValue(query(ref(db, `${BASE_PATH}/history`), limitToLast(HISTORY_LIMIT)), s => {
+    const rows = [];
+    s.forEach(c => { rows.push(c.val()); });
+    renderHistory(rows);
+  });
+}
+</script>
+</body>
+</html>
